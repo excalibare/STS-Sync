@@ -1,0 +1,13 @@
+# IDE files
+.vscode/
+
+# personal files
+config.json
+
+# runtime files
+backups/
+logs/
+temp/
+
+# cache files
+**/__pycache__/
