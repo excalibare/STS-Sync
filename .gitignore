@@ -3,6 +3,8 @@
 
 # personal files
 config.json
+pull.bat
+push.bat
 
 # runtime files
 backups/
