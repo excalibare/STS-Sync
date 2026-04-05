@@ -3,13 +3,10 @@
 import argparse
 from pathlib import Path
 
-from sts_syn.adb_client import ADBClient, AdbError
-from sts_syn.backup import BackupManager
 from sts_syn.commands.status import run_status
-from sts_syn.commands.sync_ops import perform_pull, perform_push
-from sts_syn.commands.sync_safe import run_sync_safe
 from sts_syn.config import AppConfig
-from sts_syn.manifest import write_manifest
+from sts_syn.gui import run_gui
+from sts_syn.service import SyncService
 from sts_syn.utils.logging_utils import setup_logging
 
 
@@ -44,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
         'push-save',
         'pull-runs',
         'push-runs',
+        'gui',
     ):
         subparsers.add_parser(name)
     return parser
@@ -57,112 +55,46 @@ def _load_config(path: Path) -> AppConfig:
     return AppConfig.load(path.resolve())
 
 
+def _override_serial(config: AppConfig, device_serial: str | None) -> AppConfig:
+    if not device_serial:
+        return config
+    return AppConfig(
+        config_path=config.config_path,
+        adb_path=config.adb_path,
+        device_serial=device_serial,
+        pc_root=config.pc_root,
+        pc_paths=config.pc_paths,
+        android_root=config.android_root,
+        android_paths=config.android_paths,
+        android_root_candidates=config.android_root_candidates,
+        backup_root=config.backup_root,
+        temp_root=config.temp_root,
+        log_root=config.log_root,
+        backup_keep=config.backup_keep,
+    )
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    config = _load_config(args.config)
-    if args.device_serial:
-        config = AppConfig(
-            config_path=config.config_path,
-            adb_path=config.adb_path,
-            device_serial=args.device_serial,
-            pc_root=config.pc_root,
-            pc_paths=config.pc_paths,
-            android_root=config.android_root,
-            android_paths=config.android_paths,
-            android_root_candidates=config.android_root_candidates,
-            backup_root=config.backup_root,
-            temp_root=config.temp_root,
-            log_root=config.log_root,
-            backup_keep=config.backup_keep,
-        )
+    config = _override_serial(_load_config(args.config), args.device_serial)
     config.ensure_runtime_dirs()
 
     logger = setup_logging(config.log_root, verbose=args.verbose)
     logger.info('Starting sts_sync command=%s dry_run=%s', args.command, args.dry_run)
-
-    adb = ADBClient(
-        adb_path=config.adb_path,
-        logger=logger,
-        device_serial=config.device_serial,
-        dry_run=args.dry_run,
-    )
-    backup_manager = BackupManager(config, adb, logger)
+    service = SyncService(config=config, logger=logger, dry_run=args.dry_run)
 
     try:
         if args.command == 'status':
-            return run_status(config, adb, logger)
+            return run_status(config, service.create_adb(config.device_serial), logger)
+        if args.command == 'gui':
+            return run_gui(config=config, logger=logger, dry_run=args.dry_run)
         if args.command == 'backup':
-            if not adb.check_adb_available():
-                raise AdbError(f'adb not available: {config.adb_path}')
-            serial = adb.resolve_device(config.device_serial)
-            if args.dry_run:
-                logger.info('[dry-run] Would create a full backup for all components')
-                return 0
-            session_dir = backup_manager.create_session_dir('backup')
-            copied = backup_manager.full_backup(session_dir)
-            write_manifest(
-                session_dir / 'manifest.json',
-                {
-                    'command': 'backup',
-                    'serial': serial,
-                    'dry_run': args.dry_run,
-                    'copied': copied,
-                    'config': config.to_manifest_dict(),
-                },
-            )
-            backup_manager.prune_old_backups()
-            logger.info('Backup completed: %s', session_dir)
-            return 0
-        if args.command == 'sync-safe':
-            return run_sync_safe(config, adb, backup_manager, logger, dry_run=args.dry_run)
-        if args.command == 'pull-progress':
-            return perform_pull(
-                config, adb, backup_manager, logger, 'preferences', args.command, args.dry_run
-            )
-        if args.command == 'push-progress':
-            return perform_push(
-                config,
-                adb,
-                backup_manager,
-                logger,
-                'preferences',
-                args.command,
-                args.dry_run,
-                args.force,
-            )
-        if args.command == 'pull-save':
-            logger.warning('pull-save targets current run data; make sure the game is closed.')
-            return perform_pull(config, adb, backup_manager, logger, 'saves', args.command, args.dry_run)
-        if args.command == 'push-save':
-            logger.warning('push-save is dangerous and requires --force.')
-            return perform_push(
-                config,
-                adb,
-                backup_manager,
-                logger,
-                'saves',
-                args.command,
-                args.dry_run,
-                args.force,
-            )
-        if args.command == 'pull-runs':
-            return perform_pull(config, adb, backup_manager, logger, 'runs', args.command, args.dry_run)
-        if args.command == 'push-runs':
-            return perform_push(
-                config,
-                adb,
-                backup_manager,
-                logger,
-                'runs',
-                args.command,
-                args.dry_run,
-                args.force,
-            )
-        parser.error(f'unknown command: {args.command}')
-        return 2
+            return service.run_backup(device_serial=config.device_serial)
+        return service.run_command(args.command, device_serial=config.device_serial, force=args.force)
     except Exception as exc:  # noqa: BLE001
         logger.exception('Command failed: %s', exc)
         print(f'Error: {exc}')
         return 1
+

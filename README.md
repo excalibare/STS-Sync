@@ -189,6 +189,47 @@ python -m sts_syn --config .\config.json sync-safe
 
 [详见省流用法](#批处理脚本用法)
 
+## GUI 用法
+
+现在支持一个简单的 Windows Tkinter GUI：
+
+```powershell
+python -m sts_syn --config .\config.json gui
+```
+
+GUI 主窗口包含：
+
+- 当前配置文件路径
+- ADB 状态
+- 设备状态
+- Android 路径状态
+- PC 路径状态
+- 多行日志输出框
+
+主按钮：
+
+- 检测设备
+- pull-progress
+- push-progress
+- sync-safe
+
+次按钮：
+
+- pull-save
+- push-save
+- 打开日志目录
+- 打开备份目录
+
+说明：
+
+- GUI 启动时会自动做一次轻量检测
+- 所有 ADB / 同步操作都在后台线程执行，不会卡住主窗口
+- 操作进行中会暂时禁用按钮
+- `push-save` 会先弹两次确认框，且底层仍走原有危险保护与备份逻辑
+- 如果检测到多台设备，会提示你先在下拉框选择 serial
+
+[使用 GUI](#双击启动-gui)
+
 ## 单独执行全量备份
 
 ```powershell
@@ -298,3 +339,19 @@ cd /d E:\this\repository\where\you\clone
 ```
 
 之后双击对应的 `.bat` 文件即可。
+
+## 双击启动 GUI
+
+项目根目录新增了 `launch_gui.bat`，双击即可启动：
+
+```text
+launch_gui.bat
+```
+
+默认它会使用项目根目录下的 `config.json`：
+
+```batch
+python -m sts_syn --config "%~dp0config.json" gui
+```
+
+如果你还没有 `config.json`，请先从 `config.example.json` 复制一份再修改。
