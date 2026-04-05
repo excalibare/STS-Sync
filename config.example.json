@@ -1,0 +1,20 @@
+{
+  "adb_path": "adb",
+  "device_serial": "",
+  "pc_root": "D:\\steam\\steamapps\\common\\SlayTheSpire",
+  "pc_preferences_dir": "preferences",
+  "pc_saves_dir": "saves",
+  "pc_runs_dir": "runs",
+  "android_root": "/storage/emulated/0/Android/data/com.humble.SlayTheSpire/files",
+  "android_preferences_dir": "preferences",
+  "android_saves_dir": "saves",
+  "android_runs_dir": "runs",
+  "android_root_candidates": [
+    "/storage/emulated/0/Android/data/com.humble.SlayTheSpire/files",
+    "/sdcard/Android/data/com.humble.SlayTheSpire/files"
+  ],
+  "backup_root": ".\\backups",
+  "temp_root": ".\\temp",
+  "log_root": ".\\logs",
+  "backup_keep": 10
+}
