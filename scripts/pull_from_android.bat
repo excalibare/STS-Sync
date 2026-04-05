@@ -1,11 +1,11 @@
 @echo off
-cd /d E:\code\codex\sts_syn
+cd /d E:\this\repository\where\you\clone
 
 echo ================================
-echo  Pushing progress to Android...
+echo  Pulling progress from Android...
 echo ================================
 
-python -m sts_syn --config .\config.json push-progress
+python -m sts_syn --config .\config.json pull-progress
 
 echo.
 echo Done. Press any key to exit.
