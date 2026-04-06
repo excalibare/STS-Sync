@@ -2,6 +2,7 @@
 
 import logging
 import shutil
+import zipfile
 from pathlib import Path
 from typing import Iterable
 
@@ -22,6 +23,28 @@ class BackupManager:
         session_dir = self.config.backup_root / f'{timestamp_for_path()}_{label}'
         session_dir.mkdir(parents=True, exist_ok=False)
         return session_dir
+
+    def _write_directory_to_zip(self, source_dir: Path, archive_path: Path) -> None:
+        with zipfile.ZipFile(archive_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+            if not source_dir.exists():
+                return
+            for path in sorted(source_dir.rglob('*')):
+                relative_path = path.relative_to(source_dir)
+                archive_name = relative_path.as_posix()
+                if path.is_dir():
+                    archive.writestr(f'{archive_name}/', '')
+                else:
+                    archive.write(path, arcname=archive_name)
+
+    def _compress_stage_dir(self, session_dir: Path, stage: str) -> Path:
+        stage_dir = session_dir / stage
+        archive_path = session_dir / f'{stage}.zip'
+        if archive_path.exists():
+            archive_path.unlink()
+        self._write_directory_to_zip(stage_dir, archive_path)
+        shutil.rmtree(stage_dir, ignore_errors=True)
+        self.logger.info('Compressed backup stage: %s', archive_path)
+        return archive_path
 
     def backup_components(
         self, session_dir: Path, components: Iterable[str], stage: str, dry_run: bool = False
@@ -47,6 +70,7 @@ class BackupManager:
                 self.adb.pull(android_source, android_target, check=True)
                 copied['android'].append(component)
 
+        self._compress_stage_dir(session_dir, stage)
         return copied
 
     def full_backup(self, session_dir: Path, dry_run: bool = False) -> dict[str, list[str]]:
